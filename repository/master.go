@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 	"os"
 
 	"github.com/danilomarques1/secretumserver/model"
@@ -23,6 +24,7 @@ func NewMasterRepository(client *mongo.Client) *MasterRepositoryMongo {
 
 func (r *MasterRepositoryMongo) Save(master *model.Master) error {
     if _, err := r.collection.InsertOne(context.Background(), master); err != nil {
+        log.Printf("Error when trying to insert %v\n", err)
         return err
     }
 

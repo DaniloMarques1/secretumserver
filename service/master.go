@@ -8,6 +8,7 @@ import (
 	"github.com/danilomarques1/secretumserver/model"
 	"github.com/danilomarques1/secretumserver/pb"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -30,12 +31,17 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 		return nil, err
 	}
 
+    hashedPwd, err :=  bcrypt.GenerateFromPassword([]byte(in.GetPassword()), bcrypt.DefaultCost)
+    if err != nil {
+        return nil, err
+    }
+
     masterPwdExpiration := time.Now().AddDate(0, 0, 30)
 
     master := &model.Master{
         Id: uuid.NewString(),
         Email: in.GetEmail(),
-        Pwd: in.GetPassword(),
+        Pwd: string(hashedPwd),
         PwdExpirationDate: masterPwdExpiration,
     }
 

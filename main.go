@@ -28,6 +28,10 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+
+    if err := client.Ping(context.Background(), nil); err != nil {
+        log.Fatal(err)
+    }
     
     lis, err := net.Listen("tcp", fmt.Sprintf(":%v", os.Getenv("PORT")))
     if err != nil {
