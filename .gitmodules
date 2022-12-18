@@ -1,0 +1,3 @@
+[submodule "secretumproto"]
+	path = secretumproto
+	url = https://github.com/DaniloMarques1/secretumproto
