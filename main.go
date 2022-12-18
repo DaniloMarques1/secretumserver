@@ -17,34 +17,34 @@ import (
 )
 
 func main() {
-    if err := godotenv.Load(); err != nil {
-        log.Fatal(err)
-    }
+	if err := godotenv.Load(); err != nil {
+		log.Fatal(err)
+	}
 
-    client, err := mongo.Connect(
-        context.Background(),
-        options.Client().ApplyURI(os.Getenv("DATABASE_URI")),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
+	client, err := mongo.Connect(
+		context.Background(),
+		options.Client().ApplyURI(os.Getenv("DATABASE_URI")),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    if err := client.Ping(context.Background(), nil); err != nil {
-        log.Fatal(err)
-    }
-    
-    lis, err := net.Listen("tcp", fmt.Sprintf(":%v", os.Getenv("PORT")))
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err := client.Ping(context.Background(), nil); err != nil {
+		log.Fatal(err)
+	}
 
-    masterRepo := repository.NewMasterRepository(client)
-    masterService := service.NewMasterService(masterRepo)
-    server := grpc.NewServer()
-    pb.RegisterMasterServer(server, masterService)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", os.Getenv("PORT")))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    log.Printf("Starting grpc server")
-    if err := server.Serve(lis); err != nil {
-        log.Fatal(err)
-    }
+	masterRepo := repository.NewMasterRepository(client)
+	masterService := service.NewMasterService(masterRepo)
+	server := grpc.NewServer()
+	pb.RegisterMasterServer(server, masterService)
+
+	log.Printf("Starting grpc server")
+	if err := server.Serve(lis); err != nil {
+		log.Fatal(err)
+	}
 }

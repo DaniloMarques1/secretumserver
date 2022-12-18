@@ -12,4 +12,5 @@ type Master struct {
 
 type MasterRepository interface {
 	Save(*Master) error
+	FindByEmail(string) (*Master, error)
 }
