@@ -39,9 +39,14 @@ func main() {
 	}
 
 	masterRepo := repository.NewMasterRepository(client)
+	passwordRepo := repository.NewPasswordRepositoryMongo(client)
+
 	masterService := service.NewMasterService(masterRepo)
+	passwordService := service.NewPasswordService(passwordRepo)
+
 	server := grpc.NewServer()
 	pb.RegisterMasterServer(server, masterService)
+	pb.RegisterPasswordServer(server, passwordService)
 
 	log.Printf("Starting grpc server")
 	if err := server.Serve(lis); err != nil {

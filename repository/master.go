@@ -18,16 +18,11 @@ type MasterRepositoryMongo struct {
 
 func NewMasterRepository(client *mongo.Client) *MasterRepositoryMongo {
 	collection := client.Database(os.Getenv("DATABASE")).Collection("master")
-	collection.Indexes().CreateMany(
+	collection.Indexes().CreateOne(
 		context.Background(),
-		[]mongo.IndexModel{
-			{
-				Keys:    bson.M{"email": 1},
-				Options: options.Index().SetUnique(true),
-			},
-			{
-				Keys: bson.M{"passwords": 1},
-			},
+		mongo.IndexModel{
+			Keys:    bson.M{"email": 1},
+			Options: options.Index().SetUnique(true),
 		},
 	)
 

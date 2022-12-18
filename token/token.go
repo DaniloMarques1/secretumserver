@@ -1,7 +1,6 @@
 package token
 
 import (
-	"log"
 	"os"
 	"time"
 
@@ -31,7 +30,6 @@ func GetToken(masterId string) (string, error) {
 }
 
 func ValidateToken(tokenStr string) (*Claims, error) {
-	log.Println(tokenStr)
 	claims := &Claims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
 		return []byte(os.Getenv("JWT_KEY")), nil

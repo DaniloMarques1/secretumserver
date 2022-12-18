@@ -49,6 +49,7 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 		Email:             in.GetEmail(),
 		Pwd:               string(hashedPwd),
 		PwdExpirationDate: masterPwdExpiration,
+		Passwords:         []model.Password{},
 	}
 
 	if err := ms.repository.Save(master); err != nil {
