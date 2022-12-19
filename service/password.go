@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/danilomarques1/secretumserver/model"
@@ -141,6 +143,36 @@ func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePass
 	return &pb.UpdatePasswordResponse{OK: true}, nil
 }
 
+func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.GeneratePasswordRequest) (*pb.GeneratePasswordResponse, error) {
+	if err := validateGeneratePasswordRequest(in); err != nil {
+		return nil, err
+	}
+
+	claims, err := token.ValidateToken(in.GetAccessToken())
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := ps.repository.FindByKey(claims.MasterId, in.GetKey()); err == nil {
+		return nil, ErrKeyAlreadyUsed
+	}
+
+	h := sha256.New()
+	h.Write([]byte(in.GetKeyphrase()))
+	hashingResult := fmt.Sprintf("%x", h.Sum(nil))
+	password := &model.Password{
+		Id:  uuid.NewString(),
+		Key: in.GetKey(),
+		Pwd: hashingResult,
+	}
+
+	if err := ps.repository.Save(claims.MasterId, password); err != nil {
+		return nil, err
+	}
+
+	return &pb.GeneratePasswordResponse{Id: password.Id, Key: password.Key, Password: password.Pwd}, nil
+}
+
 func validateCreatePasswordRequest(request *pb.CreatePasswordRequest) error {
 	if len(request.GetKey()) == 0 || len(request.GetPassword()) == 0 || len(request.GetAccessToken()) == 0 {
 		return ErrValidation
@@ -171,6 +203,13 @@ func validateFindKeysRequest(request *pb.FindKeysRequest) error {
 
 func validateUpdatePasswordRequest(request *pb.UpdatePasswordRequest) error {
 	if len(request.GetKey()) == 0 || len(request.GetPassword()) == 0 || len(request.GetAccessToken()) == 0 {
+		return ErrValidation
+	}
+	return nil
+}
+
+func validateGeneratePasswordRequest(request *pb.GeneratePasswordRequest) error {
+	if len(request.GetAccessToken()) == 0 || len(request.GetKey()) == 0 || len(request.GetKeyphrase()) == 0 {
 		return ErrValidation
 	}
 	return nil
