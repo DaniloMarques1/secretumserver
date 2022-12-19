@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/danilomarques1/secretumserver/model"
@@ -32,7 +33,12 @@ func NewPasswordRepositoryMongo(client *mongo.Client) *PasswordRepositoryMongo {
 }
 
 func (r *PasswordRepositoryMongo) Save(masterId string, password *model.Password) error {
-	_, err := r.collection.UpdateOne(context.Background(), bson.M{"_id": masterId}, bson.M{"$addToSet": bson.M{"passwords": password}}, options.Update())
+	_, err := r.collection.UpdateOne(
+		context.Background(),
+		bson.M{"_id": masterId},
+		bson.M{"$addToSet": bson.M{"passwords": password}},
+		options.Update(),
+	)
 	if err != nil {
 		return err
 	}
@@ -42,13 +48,60 @@ func (r *PasswordRepositoryMongo) Save(masterId string, password *model.Password
 func (r *PasswordRepositoryMongo) FindByKey(masterId, key string) (*model.Password, error) {
 	result := r.collection.FindOne(
 		context.Background(),
-		bson.M{"_id": masterId, "passwords.key": key}, options.FindOne(),
+		bson.M{"_id": masterId, "passwords.key": key},
+		options.FindOne().SetProjection(bson.M{"passwords": bson.M{"$elemMatch": bson.M{"key": key}}}),
 	)
 	master := &model.Master{}
 	if err := result.Decode(master); err != nil {
 		return nil, err
 	}
-	password := &master.Passwords[0]
+	if len(master.Passwords) == 0 {
+		return nil, errors.New("No password found")
+	}
 
+	password := &master.Passwords[0]
 	return password, nil
+}
+
+func (r *PasswordRepositoryMongo) Remove(masterId string, password *model.Password) error {
+	_, err := r.collection.UpdateOne(
+		context.Background(),
+		bson.M{"_id": masterId},
+		bson.M{"$pull": bson.M{"passwords": bson.M{"key": password.Key}}}, options.Update(),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *PasswordRepositoryMongo) FindKeys(masterId string) ([]string, error) {
+	result := r.collection.FindOne(context.Background(), bson.M{"_id": masterId}, options.FindOne())
+	master := &model.Master{}
+	if err := result.Decode(master); err != nil {
+		return nil, err
+	}
+
+	keys := make([]string, 0, len(master.Passwords))
+	for _, password := range master.Passwords {
+		keys = append(keys, password.Key)
+	}
+
+	return keys, nil
+}
+
+func (r *PasswordRepositoryMongo) Update(masterId string, password *model.Password) error {
+	_, err := r.collection.UpdateOne(
+		context.Background(),
+		bson.M{"_id": masterId, "passwords.key": password.Key},
+		bson.M{"$set": bson.M{"passwords.$.password": password.Pwd}},
+		options.Update(),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
