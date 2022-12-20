@@ -21,8 +21,7 @@ func NewPasswordRepositoryMongo(client *mongo.Client) *PasswordRepositoryMongo {
 	collection.Indexes().CreateOne(
 		context.Background(),
 		mongo.IndexModel{
-			Keys:    bson.M{"passwords.key": 1},
-			Options: options.Index().SetUnique(true),
+			Keys: bson.M{"passwords.key": 1},
 		},
 	)
 
