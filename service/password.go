@@ -2,11 +2,10 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
-	"fmt"
 	"log"
 
+	"github.com/danilomarques1/secretumserver/generate"
 	"github.com/danilomarques1/secretumserver/model"
 	"github.com/danilomarques1/secretumserver/pb"
 	"github.com/danilomarques1/secretumserver/token"
@@ -157,13 +156,11 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 		return nil, ErrKeyAlreadyUsed
 	}
 
-	h := sha256.New()
-	h.Write([]byte(in.GetKeyphrase()))
-	hashingResult := fmt.Sprintf("%x", h.Sum(nil))
+	generatedPassword := generate.GeneratePassword(in.GetKeyphrase())
 	password := &model.Password{
 		Id:  uuid.NewString(),
 		Key: in.GetKey(),
-		Pwd: hashingResult,
+		Pwd: generatedPassword,
 	}
 
 	if err := ps.repository.Save(claims.MasterId, password); err != nil {
