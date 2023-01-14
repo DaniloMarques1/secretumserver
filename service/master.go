@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/danilomarques1/secretumserver/model"
@@ -11,12 +10,15 @@ import (
 	"github.com/danilomarques1/secretumserver/token"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-var (
-	ErrValidation       = errors.New("Error validating request body")
-	ErrEmailAlreadyUsed = errors.New("Master email already used")
-	ErrPasswordExpired  = errors.New("Password has expired")
+const (
+	ErrValidation       = "Error validating request body"
+	ErrEmailAlreadyUsed = "Master email already used"
+	ErrPasswordExpired  = "Password has expired"
+	ErrWrongPassword    = "The given password is invalid"
 )
 
 type MasterService struct {
@@ -36,12 +38,19 @@ func NewMasterService() (*MasterService, error) {
 }
 
 func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequest) (*pb.CreateMasterResponse, error) {
-	if err := validateCreateMasterRequest(in); err != nil {
-		return nil, err
+	if !isValidCreateMasterRequest(in) {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			ErrValidation,
+		)
 	}
 
 	if _, err := ms.masterRepo.FindByEmail(in.GetEmail()); err == nil {
-		return nil, ErrEmailAlreadyUsed
+		return nil, status.Errorf(
+			codes.AlreadyExists,
+			ErrEmailAlreadyUsed,
+		)
+
 	}
 
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(in.GetPassword()), bcrypt.DefaultCost)
@@ -69,8 +78,11 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 }
 
 func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMasterRequest) (*pb.AuthMasterResponse, error) {
-	if err := validateAuthMasterRequest(in); err != nil {
-		return nil, err
+	if !isValidteAuthMasterRequest(in) {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			ErrValidation,
+		)
 	}
 
 	master, err := ms.masterRepo.FindByEmail(in.GetEmail())
@@ -78,13 +90,14 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 		return nil, err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(master.Pwd), []byte(in.GetPassword())); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.NotFound, ErrWrongPassword)
 	}
 
 	// TODO: need to think a way so the client knows that it
 	// needs to require a password update
 	if master.PwdExpirationDate.Unix() <= time.Now().Unix() {
-		return nil, ErrPasswordExpired
+		return nil, status.Errorf(codes.PermissionDenied,
+			ErrPasswordExpired)
 	}
 
 	tokenStr, err := token.GetToken(master.Id)
@@ -98,18 +111,10 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 	}, nil
 }
 
-func validateCreateMasterRequest(request *pb.CreateMasterRequest) error {
-	if len(request.GetEmail()) > 0 && len(request.GetPassword()) > 0 {
-		return nil
-	}
-
-	return ErrValidation
+func isValidCreateMasterRequest(request *pb.CreateMasterRequest) bool {
+	return len(request.GetEmail()) > 0 && len(request.GetPassword()) > 0
 }
 
-func validateAuthMasterRequest(request *pb.AuthMasterRequest) error {
-	if len(request.GetEmail()) > 0 && len(request.GetPassword()) > 0 {
-		return nil
-	}
-
-	return ErrValidation
+func isValidteAuthMasterRequest(request *pb.AuthMasterRequest) bool {
+	return len(request.GetEmail()) > 0 && len(request.GetPassword()) > 0
 }

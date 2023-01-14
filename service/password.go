@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log"
 
 	"github.com/danilomarques1/secretumserver/generate"
@@ -11,10 +10,12 @@ import (
 	"github.com/danilomarques1/secretumserver/repository"
 	"github.com/danilomarques1/secretumserver/token"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
-	ErrKeyAlreadyUsed = errors.New("Key already used")
+	ErrKeyAlreadyUsed = "Key already used"
 )
 
 type PasswordService struct {
@@ -33,8 +34,11 @@ func NewPasswordService() (*PasswordService, error) {
 }
 
 func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePasswordRequest) (*pb.CreatePasswordResponse, error) {
-	if err := validateCreatePasswordRequest(in); err != nil {
-		return nil, err
+	if !isValidCreatePasswordRequest(in) {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			ErrValidation,
+		)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
@@ -44,7 +48,7 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 	masterId := claims.MasterId
 
 	if _, err := ps.passwordRepository.FindByKey(masterId, in.GetKey()); err == nil {
-		return nil, ErrKeyAlreadyUsed
+		return nil, status.Errorf(codes.AlreadyExists, ErrKeyAlreadyUsed)
 	}
 
 	password := &model.Password{
@@ -61,9 +65,10 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 }
 
 func (ps *PasswordService) FindPassword(ctx context.Context, in *pb.FindPasswordRequest) (*pb.FindPasswordResponse, error) {
-	if err := validateFindPasswordRequest(in); err != nil {
-		return nil, err
+	if !isValidteFindPasswordRequest(in) {
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
+
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
 		return nil, err
@@ -84,8 +89,8 @@ func (ps *PasswordService) FindPassword(ctx context.Context, in *pb.FindPassword
 func (ps *PasswordService) RemovePassword(ctx context.Context, in *pb.RemovePasswordRequest) (*pb.RemovePasswordResponse, error) {
 	log.Printf("request = %v\n", in)
 
-	if err := validateRemovePasswordRequest(in); err != nil {
-		return nil, err
+	if !isValidRemovePasswordRequest(in) {
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
@@ -106,8 +111,8 @@ func (ps *PasswordService) RemovePassword(ctx context.Context, in *pb.RemovePass
 }
 
 func (ps *PasswordService) FindKeys(ctx context.Context, in *pb.FindKeysRequest) (*pb.FindKeysResponse, error) {
-	if err := validateFindKeysRequest(in); err != nil {
-		return nil, err
+	if !isValidFindKeysRequest(in) {
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
@@ -125,8 +130,8 @@ func (ps *PasswordService) FindKeys(ctx context.Context, in *pb.FindKeysRequest)
 
 func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePasswordRequest) (*pb.UpdatePasswordResponse, error) {
 	log.Printf("Update request = %#v\n", in)
-	if err := validateUpdatePasswordRequest(in); err != nil {
-		return nil, err
+	if !isValidUpdatePasswordRequest(in) {
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
@@ -148,8 +153,8 @@ func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePass
 }
 
 func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.GeneratePasswordRequest) (*pb.GeneratePasswordResponse, error) {
-	if err := validateGeneratePasswordRequest(in); err != nil {
-		return nil, err
+	if !isValidGeneratePasswordRequest(in) {
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
@@ -158,7 +163,7 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 	}
 
 	if _, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey()); err == nil {
-		return nil, ErrKeyAlreadyUsed
+		return nil, status.Errorf(codes.AlreadyExists, ErrKeyAlreadyUsed)
 	}
 
 	generatedPassword := generate.GeneratePassword(in.GetKeyphrase())
@@ -175,44 +180,26 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 	return &pb.GeneratePasswordResponse{Id: password.Id, Key: password.Key, Password: password.Pwd}, nil
 }
 
-func validateCreatePasswordRequest(request *pb.CreatePasswordRequest) error {
-	if len(request.GetKey()) == 0 || len(request.GetPassword()) == 0 || len(request.GetAccessToken()) == 0 {
-		return ErrValidation
-	}
-	return nil
+func isValidCreatePasswordRequest(request *pb.CreatePasswordRequest) bool {
+	return len(request.GetKey()) > 0 && len(request.GetPassword()) > 0 && len(request.GetAccessToken()) > 0
 }
 
-func validateFindPasswordRequest(request *pb.FindPasswordRequest) error {
-	if len(request.GetAccessToken()) == 0 || len(request.GetKey()) == 0 {
-		return ErrValidation
-	}
-	return nil
+func isValidteFindPasswordRequest(request *pb.FindPasswordRequest) bool {
+	return len(request.GetAccessToken()) > 0 && len(request.GetKey()) > 0
 }
 
-func validateRemovePasswordRequest(request *pb.RemovePasswordRequest) error {
-	if len(request.GetAccessToken()) == 0 || len(request.GetKey()) == 0 {
-		return ErrValidation
-	}
-	return nil
+func isValidRemovePasswordRequest(request *pb.RemovePasswordRequest) bool {
+	return len(request.GetAccessToken()) > 0 && len(request.GetKey()) > 0
 }
 
-func validateFindKeysRequest(request *pb.FindKeysRequest) error {
-	if len(request.GetAccessToken()) == 0 {
-		return ErrValidation
-	}
-	return nil
+func isValidFindKeysRequest(request *pb.FindKeysRequest) bool {
+	return len(request.GetAccessToken()) > 0
 }
 
-func validateUpdatePasswordRequest(request *pb.UpdatePasswordRequest) error {
-	if len(request.GetKey()) == 0 || len(request.GetPassword()) == 0 || len(request.GetAccessToken()) == 0 {
-		return ErrValidation
-	}
-	return nil
+func isValidUpdatePasswordRequest(request *pb.UpdatePasswordRequest) bool {
+	return len(request.GetKey()) > 0 && len(request.GetPassword()) > 0 && len(request.GetAccessToken()) == 0
 }
 
-func validateGeneratePasswordRequest(request *pb.GeneratePasswordRequest) error {
-	if len(request.GetAccessToken()) == 0 || len(request.GetKey()) == 0 || len(request.GetKeyphrase()) == 0 {
-		return ErrValidation
-	}
-	return nil
+func isValidGeneratePasswordRequest(request *pb.GeneratePasswordRequest) bool {
+	return len(request.GetAccessToken()) > 0 && len(request.GetKey()) == 0 && len(request.GetKeyphrase()) > 0
 }
