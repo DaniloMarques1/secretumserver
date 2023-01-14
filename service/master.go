@@ -96,8 +96,10 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 	// TODO: need to think a way so the client knows that it
 	// needs to require a password update
 	if master.PwdExpirationDate.Unix() <= time.Now().Unix() {
-		return nil, status.Errorf(codes.PermissionDenied,
-			ErrPasswordExpired)
+		return nil, status.Errorf(
+			codes.PermissionDenied,
+			ErrPasswordExpired,
+		)
 	}
 
 	tokenStr, err := token.GetToken(master.Id)
