@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/danilomarques1/secretumserver/database"
 	"github.com/danilomarques1/secretumserver/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,7 +17,11 @@ type MasterRepositoryMongo struct {
 	collection *mongo.Collection
 }
 
-func NewMasterRepository(client *mongo.Client) *MasterRepositoryMongo {
+func NewMasterRepository() (*MasterRepositoryMongo, error) {
+	client, err := database.GetDatabaseConnection()
+	if err != nil {
+		return nil, err
+	}
 	collection := client.Database(os.Getenv("DATABASE")).Collection("master")
 	collection.Indexes().CreateOne(
 		context.Background(),
@@ -29,7 +34,7 @@ func NewMasterRepository(client *mongo.Client) *MasterRepositoryMongo {
 	return &MasterRepositoryMongo{
 		client:     client,
 		collection: collection,
-	}
+	}, nil
 }
 
 func (r *MasterRepositoryMongo) Save(master *model.Master) error {

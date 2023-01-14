@@ -8,6 +8,7 @@ import (
 	"github.com/danilomarques1/secretumserver/generate"
 	"github.com/danilomarques1/secretumserver/model"
 	"github.com/danilomarques1/secretumserver/pb"
+	"github.com/danilomarques1/secretumserver/repository"
 	"github.com/danilomarques1/secretumserver/token"
 	"github.com/google/uuid"
 )
@@ -18,13 +19,17 @@ var (
 
 type PasswordService struct {
 	pb.UnimplementedPasswordServer
-	repository model.PasswordRepository
+	passwordRepository model.PasswordRepository
 }
 
-func NewPasswordService(repository model.PasswordRepository) *PasswordService {
-	return &PasswordService{
-		repository: repository,
+func NewPasswordService() (*PasswordService, error) {
+	passwordRepository, err := repository.NewPasswordRepository()
+	if err != nil {
+		return nil, err
 	}
+	return &PasswordService{
+		passwordRepository: passwordRepository,
+	}, nil
 }
 
 func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePasswordRequest) (*pb.CreatePasswordResponse, error) {
@@ -38,7 +43,7 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 	}
 	masterId := claims.MasterId
 
-	if _, err := ps.repository.FindByKey(masterId, in.GetKey()); err == nil {
+	if _, err := ps.passwordRepository.FindByKey(masterId, in.GetKey()); err == nil {
 		return nil, ErrKeyAlreadyUsed
 	}
 
@@ -48,7 +53,7 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 		Pwd: in.GetPassword(),
 	}
 
-	if err := ps.repository.Save(masterId, password); err != nil {
+	if err := ps.passwordRepository.Save(masterId, password); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +70,7 @@ func (ps *PasswordService) FindPassword(ctx context.Context, in *pb.FindPassword
 	}
 
 	masterId := claims.MasterId
-	password, err := ps.repository.FindByKey(masterId, in.GetKey())
+	password, err := ps.passwordRepository.FindByKey(masterId, in.GetKey())
 	if err != nil {
 		return nil, err
 	}
@@ -88,12 +93,12 @@ func (ps *PasswordService) RemovePassword(ctx context.Context, in *pb.RemovePass
 		return nil, err
 	}
 
-	password, err := ps.repository.FindByKey(claims.MasterId, in.GetKey())
+	password, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ps.repository.Remove(claims.MasterId, password); err != nil {
+	if err := ps.passwordRepository.Remove(claims.MasterId, password); err != nil {
 		return nil, err
 	}
 
@@ -110,7 +115,7 @@ func (ps *PasswordService) FindKeys(ctx context.Context, in *pb.FindKeysRequest)
 		return nil, err
 	}
 
-	keys, err := ps.repository.FindKeys(claims.MasterId)
+	keys, err := ps.passwordRepository.FindKeys(claims.MasterId)
 	if err != nil {
 		return nil, err
 	}
@@ -129,13 +134,13 @@ func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePass
 		return nil, err
 	}
 
-	password, err := ps.repository.FindByKey(claims.MasterId, in.GetKey())
+	password, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey())
 	if err != nil {
 		return nil, err
 	}
 
 	password.Pwd = in.GetPassword()
-	if err := ps.repository.Update(claims.MasterId, password); err != nil {
+	if err := ps.passwordRepository.Update(claims.MasterId, password); err != nil {
 		return nil, err
 	}
 
@@ -152,7 +157,7 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 		return nil, err
 	}
 
-	if _, err := ps.repository.FindByKey(claims.MasterId, in.GetKey()); err == nil {
+	if _, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey()); err == nil {
 		return nil, ErrKeyAlreadyUsed
 	}
 
@@ -163,7 +168,7 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 		Pwd: generatedPassword,
 	}
 
-	if err := ps.repository.Save(claims.MasterId, password); err != nil {
+	if err := ps.passwordRepository.Save(claims.MasterId, password); err != nil {
 		return nil, err
 	}
 

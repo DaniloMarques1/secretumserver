@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/danilomarques1/secretumserver/database"
 	"github.com/danilomarques1/secretumserver/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,7 +17,11 @@ type PasswordRepositoryMongo struct {
 	collection *mongo.Collection
 }
 
-func NewPasswordRepositoryMongo(client *mongo.Client) *PasswordRepositoryMongo {
+func NewPasswordRepository() (*PasswordRepositoryMongo, error) {
+	client, err := database.GetDatabaseConnection()
+	if err != nil {
+		return nil, err
+	}
 	collection := client.Database(os.Getenv("DATABASE")).Collection("master")
 	collection.Indexes().CreateOne(
 		context.Background(),
@@ -28,7 +33,7 @@ func NewPasswordRepositoryMongo(client *mongo.Client) *PasswordRepositoryMongo {
 	return &PasswordRepositoryMongo{
 		client:     client,
 		collection: collection,
-	}
+	}, nil
 }
 
 func (r *PasswordRepositoryMongo) Save(masterId string, password *model.Password) error {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/danilomarques1/secretumserver/model"
 	"github.com/danilomarques1/secretumserver/pb"
+	"github.com/danilomarques1/secretumserver/repository"
 	"github.com/danilomarques1/secretumserver/token"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -19,13 +20,18 @@ var (
 
 type MasterService struct {
 	pb.UnimplementedMasterServer
-	repository model.MasterRepository
+	masterRepo model.MasterRepository
 }
 
-func NewMasterService(repository model.MasterRepository) *MasterService {
-	return &MasterService{
-		repository: repository,
+func NewMasterService() (*MasterService, error) {
+	masterRepo, err := repository.NewMasterRepository()
+	if err != nil {
+		return nil, err
 	}
+
+	return &MasterService{
+		masterRepo: masterRepo,
+	}, nil
 }
 
 func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequest) (*pb.CreateMasterResponse, error) {
@@ -33,7 +39,7 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 		return nil, err
 	}
 
-	if _, err := ms.repository.FindByEmail(in.GetEmail()); err == nil {
+	if _, err := ms.masterRepo.FindByEmail(in.GetEmail()); err == nil {
 		return nil, ErrEmailAlreadyUsed
 	}
 
@@ -52,7 +58,7 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 		Passwords:         []model.Password{},
 	}
 
-	if err := ms.repository.Save(master); err != nil {
+	if err := ms.masterRepo.Save(master); err != nil {
 		return nil, err
 	}
 
@@ -66,13 +72,15 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 		return nil, err
 	}
 
-	master, err := ms.repository.FindByEmail(in.GetEmail())
+	master, err := ms.masterRepo.FindByEmail(in.GetEmail())
 	if err != nil {
 		return nil, err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(master.Pwd), []byte(in.GetPassword())); err != nil {
 		return nil, err
 	}
+
+	// TODO: validate if the password expired
 
 	tokenStr, err := token.GetToken(master.Id)
 	if err != nil {
