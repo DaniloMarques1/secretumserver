@@ -16,6 +16,7 @@ import (
 var (
 	ErrValidation       = errors.New("Error validating request body")
 	ErrEmailAlreadyUsed = errors.New("Master email already used")
+	ErrPasswordExpired  = errors.New("Password has expired")
 )
 
 type MasterService struct {
@@ -80,7 +81,11 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 		return nil, err
 	}
 
-	// TODO: validate if the password expired
+	// TODO: need to think a way so the client knows that it
+	// needs to require a password update
+	if master.PwdExpirationDate.Unix() <= time.Now().Unix() {
+		return nil, ErrPasswordExpired
+	}
 
 	tokenStr, err := token.GetToken(master.Id)
 	if err != nil {
