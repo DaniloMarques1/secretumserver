@@ -55,3 +55,12 @@ func (r *MasterRepositoryMongo) FindByEmail(email string) (*model.Master, error)
 
 	return master, nil
 }
+
+func (r *MasterRepositoryMongo) Update(master *model.Master) error {
+	filter := bson.M{"email": master.Email}
+	update := bson.M{"$set": master}
+	if _, err := r.collection.UpdateOne(context.Background(), filter, update, options.Update()); err != nil {
+		return err
+	}
+	return nil
+}

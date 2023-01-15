@@ -50,7 +50,6 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 			codes.AlreadyExists,
 			ErrEmailAlreadyUsed,
 		)
-
 	}
 
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(in.GetPassword()), bcrypt.DefaultCost)
@@ -58,8 +57,7 @@ func (ms *MasterService) SaveMaster(ctx context.Context, in *pb.CreateMasterRequ
 		return nil, err
 	}
 
-	masterPwdExpiration := time.Now().AddDate(0, 0, 30)
-
+	masterPwdExpiration := ms.getPasswordExpirationDate()
 	master := &model.Master{
 		Id:                uuid.NewString(),
 		Email:             in.GetEmail(),
@@ -93,8 +91,8 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 		return nil, status.Errorf(codes.NotFound, ErrWrongPassword)
 	}
 
-	// TODO: need to think a way so the client knows that it
-	// needs to require a password update
+	// by returning PermissionDenied the client will interpret it
+	// as needing to update the password
 	if master.PwdExpirationDate.Unix() <= time.Now().Unix() {
 		return nil, status.Errorf(
 			codes.PermissionDenied,
@@ -113,10 +111,49 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 	}, nil
 }
 
+func (ms *MasterService) UpdateMaster(ctx context.Context, in *pb.UpdateMasterRequest) (*pb.UpdateMasterResponse, error) {
+	if !isValidUpdateMasterRequest(in) {
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
+	}
+	master, err := ms.masterRepo.FindByEmail(in.GetEmail())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(master.Pwd), []byte(in.GetOldPassword())); err != nil {
+		return nil, status.Errorf(codes.NotFound, ErrWrongPassword)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(in.GetNewPassword()), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	master.Pwd = string(hashedPassword)
+	master.PwdExpirationDate = ms.getPasswordExpirationDate()
+	if err := ms.masterRepo.Update(master); err != nil {
+		return nil, err
+	}
+
+	return &pb.UpdateMasterResponse{
+		OK: true,
+	}, nil
+
+}
+
+// return now + 30 days
+func (ms *MasterService) getPasswordExpirationDate() time.Time {
+	return time.Now().AddDate(-1, 0, 30)
+}
+
 func isValidCreateMasterRequest(request *pb.CreateMasterRequest) bool {
 	return len(request.GetEmail()) > 0 && len(request.GetPassword()) > 0
 }
 
 func isValidteAuthMasterRequest(request *pb.AuthMasterRequest) bool {
 	return len(request.GetEmail()) > 0 && len(request.GetPassword()) > 0
+}
+
+func isValidUpdateMasterRequest(request *pb.UpdateMasterRequest) bool {
+	return len(request.GetEmail()) > 0 && len(request.GetOldPassword()) > 0 && len(request.GetNewPassword()) > 0
+
 }
