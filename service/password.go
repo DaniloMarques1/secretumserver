@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/danilomarques1/secretumserver/encrypt"
 	"github.com/danilomarques1/secretumserver/generate"
 	"github.com/danilomarques1/secretumserver/model"
 	"github.com/danilomarques1/secretumserver/pb"
@@ -26,6 +27,7 @@ type PasswordService struct {
 func NewPasswordService() (*PasswordService, error) {
 	passwordRepository, err := repository.NewPasswordRepository()
 	if err != nil {
+		log.Printf("Error creating password service %v\n", err)
 		return nil, err
 	}
 	return &PasswordService{
@@ -35,6 +37,7 @@ func NewPasswordService() (*PasswordService, error) {
 
 func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePasswordRequest) (*pb.CreatePasswordResponse, error) {
 	if !isValidCreatePasswordRequest(in) {
+		log.Printf("Error validating save password request\n")
 		return nil, status.Errorf(
 			codes.InvalidArgument,
 			ErrValidation,
@@ -43,21 +46,36 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
+		log.Printf("Error validating token %v\n", err)
 		return nil, err
 	}
 	masterId := claims.MasterId
 
 	if _, err := ps.passwordRepository.FindByKey(masterId, in.GetKey()); err == nil {
+		log.Printf("Error because is already registered\n")
 		return nil, status.Errorf(codes.AlreadyExists, ErrKeyAlreadyUsed)
+	}
+
+	// TODO: refactor
+	e, err := encrypt.NewEncrypt(in.GetPassword())
+	if err != nil {
+		log.Printf("Error getting the encryption type %v\n", err)
+		return nil, err
+	}
+	encrypted, err := e.EncryptMessage()
+	if err != nil {
+		log.Printf("Error while encrypting password %v\n", err)
+		return nil, err
 	}
 
 	password := &model.Password{
 		Id:  uuid.NewString(),
 		Key: in.GetKey(),
-		Pwd: in.GetPassword(),
+		Pwd: encrypted,
 	}
 
 	if err := ps.passwordRepository.Save(masterId, password); err != nil {
+		log.Printf("Error while saving password %v\n", err)
 		return nil, err
 	}
 
@@ -66,44 +84,61 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 
 func (ps *PasswordService) FindPassword(ctx context.Context, in *pb.FindPasswordRequest) (*pb.FindPasswordResponse, error) {
 	if !isValidteFindPasswordRequest(in) {
+		log.Printf("Error validating find password request\n")
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
+		log.Printf("Error validating token %v\n", err)
 		return nil, err
 	}
 
 	masterId := claims.MasterId
 	password, err := ps.passwordRepository.FindByKey(masterId, in.GetKey())
 	if err != nil {
+		log.Printf("Error finding the password %v\n", err)
 		return nil, err
 	}
+	// TODO: refactor
+	d, err := encrypt.NewDecrypt(password.Pwd)
+	if err != nil {
+		log.Printf("Error getting the decryption type %v\n", err)
+		return nil, err
+	}
+	decrypted, err := d.DecryptMessage()
+	if err != nil {
+		log.Printf("Error while decrypting password %v\n", err)
+		return nil, err
+	}
+
 	return &pb.FindPasswordResponse{
 		Id:       password.Id,
 		Key:      password.Key,
-		Password: password.Pwd,
+		Password: decrypted,
 	}, nil
 }
 
 func (ps *PasswordService) RemovePassword(ctx context.Context, in *pb.RemovePasswordRequest) (*pb.RemovePasswordResponse, error) {
-	log.Printf("request = %v\n", in)
-
 	if !isValidRemovePasswordRequest(in) {
+		log.Printf("Error validating remove password request\n")
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
+		log.Printf("Error validating token %v\n", err)
 		return nil, err
 	}
 
 	password, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey())
 	if err != nil {
+		log.Printf("Error finding password by key %v\n", err)
 		return nil, err
 	}
 
 	if err := ps.passwordRepository.Remove(claims.MasterId, password); err != nil {
+		log.Printf("Error removing password %v\n", err)
 		return nil, err
 	}
 
@@ -112,11 +147,13 @@ func (ps *PasswordService) RemovePassword(ctx context.Context, in *pb.RemovePass
 
 func (ps *PasswordService) FindKeys(ctx context.Context, in *pb.FindKeysRequest) (*pb.FindKeysResponse, error) {
 	if !isValidFindKeysRequest(in) {
+		log.Printf("Error validating find keys request\n")
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
+		log.Printf("Error validating token %v\n", err)
 		return nil, err
 	}
 
@@ -129,23 +166,37 @@ func (ps *PasswordService) FindKeys(ctx context.Context, in *pb.FindKeysRequest)
 }
 
 func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePasswordRequest) (*pb.UpdatePasswordResponse, error) {
-	log.Printf("Update request = %#v\n", in)
 	if !isValidUpdatePasswordRequest(in) {
+		log.Printf("Error validating update password request\n")
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
+		log.Printf("Error validating token %v\n", err)
 		return nil, err
 	}
 
 	password, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey())
 	if err != nil {
+		log.Printf("Error finding the password %v\n", err)
 		return nil, err
 	}
 
-	password.Pwd = in.GetPassword()
+	e, err := encrypt.NewEncrypt(in.GetPassword())
+	if err != nil {
+		log.Printf("Error getting the encryption type %v\n", err)
+		return nil, err
+	}
+	encrypted, err := e.EncryptMessage()
+	if err != nil {
+		log.Printf("Error encrypting password %v\n", err)
+		return nil, err
+	}
+
+	password.Pwd = encrypted
 	if err := ps.passwordRepository.Update(claims.MasterId, password); err != nil {
+		log.Printf("Error updating password %v\n", err)
 		return nil, err
 	}
 
@@ -154,26 +205,40 @@ func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePass
 
 func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.GeneratePasswordRequest) (*pb.GeneratePasswordResponse, error) {
 	if !isValidGeneratePasswordRequest(in) {
+		log.Printf("Error validating find password request\n")
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
 	claims, err := token.ValidateToken(in.GetAccessToken())
 	if err != nil {
+		log.Printf("Error validating token %v\n", err)
 		return nil, err
 	}
 
 	if _, err := ps.passwordRepository.FindByKey(claims.MasterId, in.GetKey()); err == nil {
+		log.Printf("Error because is already registered\n")
 		return nil, status.Errorf(codes.AlreadyExists, ErrKeyAlreadyUsed)
 	}
 
 	generatedPassword := generate.GeneratePassword(in.GetKeyphrase())
+	e, err := encrypt.NewEncrypt(generatedPassword)
+	if err != nil {
+		log.Printf("Error getting the encryption type %v\n", err)
+		return nil, err
+	}
+	encrypted, err := e.EncryptMessage()
+	if err != nil {
+		log.Printf("Error encrypting message %v\n", err)
+		return nil, err
+	}
 	password := &model.Password{
 		Id:  uuid.NewString(),
 		Key: in.GetKey(),
-		Pwd: generatedPassword,
+		Pwd: encrypted,
 	}
 
 	if err := ps.passwordRepository.Save(claims.MasterId, password); err != nil {
+		log.Printf("error when saving password %v\n", err)
 		return nil, err
 	}
 
@@ -201,5 +266,5 @@ func isValidUpdatePasswordRequest(request *pb.UpdatePasswordRequest) bool {
 }
 
 func isValidGeneratePasswordRequest(request *pb.GeneratePasswordRequest) bool {
-	return len(request.GetAccessToken()) > 0 && len(request.GetKey()) == 0 && len(request.GetKeyphrase()) > 0
+	return len(request.GetAccessToken()) > 0 && len(request.GetKey()) > 0 && len(request.GetKeyphrase()) > 0
 }

@@ -97,13 +97,9 @@ func (r *PasswordRepositoryMongo) FindKeys(masterId string) ([]string, error) {
 }
 
 func (r *PasswordRepositoryMongo) Update(masterId string, password *model.Password) error {
-	_, err := r.collection.UpdateOne(
-		context.Background(),
-		bson.M{"_id": masterId, "passwords.key": password.Key},
-		bson.M{"$set": bson.M{"passwords.$.password": password.Pwd}},
-		options.Update(),
-	)
-	if err != nil {
+	filter := bson.M{"_id": masterId, "passwords.key": password.Key}
+	update := bson.M{"$set": bson.M{"passwords.$.password": password.Pwd}}
+	if _, err := r.collection.UpdateOne(context.Background(), filter, update, options.Update()); err != nil {
 		return err
 	}
 
