@@ -171,5 +171,4 @@ func isValidteAuthMasterRequest(request *pb.AuthMasterRequest) bool {
 
 func isValidUpdateMasterRequest(request *pb.UpdateMasterRequest) bool {
 	return len(request.GetEmail()) > 0 && len(request.GetOldPassword()) > 0 && len(request.GetNewPassword()) > 0
-
 }

@@ -23,19 +23,14 @@ const (
 // TODO better name?
 type Encrypt interface {
 	// will return the message encrypted
-	EncryptMessage() (string, error)
+	EncryptMessage(plainText string) (string, error)
 }
 
 type encrypt struct {
-	key       []byte
-	plainText string
+	key []byte
 }
 
-func NewEncrypt(message string) (Encrypt, error) {
-	if len(message) == 0 {
-		return nil, ErrInvalidPlainText
-	}
-
+func NewEncrypt() (Encrypt, error) {
 	key := os.Getenv("ENCRYPT_KEY")
 	if len(key) == 0 {
 		return nil, ErrInvalidKey
@@ -47,38 +42,13 @@ func NewEncrypt(message string) (Encrypt, error) {
 
 	e := &encrypt{}
 	e.key = []byte(hashedKey[:32])
-	e.plainText = message
 
 	return e, nil
 }
 
-// TODO: we need to break the message into a slice of strings
-// where each string cannot have more then 16 chars
-func (e *encrypt) parsePlainTextParts() ([]string, error) {
-	messageSize := len(e.plainText)
-	if messageSize < PlainTextPartSize {
-		return []string{e.plainText}, nil
-	}
-	partsSize := int(math.Ceil(float64(messageSize) / float64(PlainTextPartSize)))
-	parts := make([]string, 0, partsSize)
-	start := 0
-	end := PlainTextPartSize
-	for i := 0; i < partsSize; i++ {
-		part := e.plainText[start:end]
-		parts = append(parts, part)
-
-		start += PlainTextPartSize
-		end += PlainTextPartSize
-		if end > messageSize {
-			end = messageSize
-		}
-	}
-
-	return parts, nil
-}
-
-func (e *encrypt) EncryptMessage() (string, error) {
-	parts, err := e.parsePlainTextParts()
+// returns the message encrypted
+func (e *encrypt) EncryptMessage(plainText string) (string, error) {
+	parts, err := e.parsePlainTextParts(plainText)
 	if err != nil {
 		return "", err
 	}
@@ -99,21 +69,41 @@ func (e *encrypt) EncryptMessage() (string, error) {
 	return hex.EncodeToString(encrypted), nil
 }
 
+// breaks the plainText into slice of 16 chars each element (the last element may not have 16 chars)
+func (e *encrypt) parsePlainTextParts(plainText string) ([]string, error) {
+	messageSize := len(plainText)
+	if messageSize < PlainTextPartSize {
+		return []string{plainText}, nil
+	}
+	partsSize := int(math.Ceil(float64(messageSize) / float64(PlainTextPartSize)))
+	parts := make([]string, 0, partsSize)
+	start := 0
+	end := PlainTextPartSize
+	for i := 0; i < partsSize; i++ {
+		part := plainText[start:end]
+		parts = append(parts, part)
+
+		start += PlainTextPartSize
+		end += PlainTextPartSize
+		if end > messageSize {
+			end = messageSize
+		}
+	}
+
+	return parts, nil
+}
+
 // TODO better name?
 type Decrypt interface {
 	// will return the message decrypted
-	DecryptMessage() (string, error)
+	DecryptMessage(cipherText string) (string, error)
 }
 
 type decrypt struct {
-	key        []byte
-	cipherText string // TODO better name?
+	key []byte
 }
 
-func NewDecrypt(message string) (Decrypt, error) {
-	if len(message) == 0 {
-		return nil, ErrInvalidPlainText
-	}
+func NewDecrypt() (Decrypt, error) {
 	key := os.Getenv("ENCRYPT_KEY")
 	if len(key) == 0 {
 		return nil, ErrInvalidKey
@@ -125,13 +115,12 @@ func NewDecrypt(message string) (Decrypt, error) {
 
 	d := &decrypt{}
 	d.key = []byte(hashedKey[:32])
-	d.cipherText = message
 
 	return d, nil
 }
 
-func (d *decrypt) DecryptMessage() (string, error) {
-	parts, err := d.parseCipherText()
+func (d *decrypt) DecryptMessage(cipherText string) (string, error) {
+	parts, err := d.parseCipherText(cipherText)
 	if err != nil {
 		return "", err
 	}
@@ -153,27 +142,30 @@ func (d *decrypt) DecryptMessage() (string, error) {
 		decryptedMessage = append(decryptedMessage, dst...)
 	}
 	out := string(decryptedMessage[:])
-	out = strings.ReplaceAll(out, "\x00", "")
+	out = strings.ReplaceAll(out, "\x00", "") // removing the null
 
 	return out, nil
 }
 
-func (d *decrypt) parseCipherText() ([]string, error) {
-	if len(d.cipherText) < CipherTextPartSize {
+// returns the cipherText as blocks of 32 chars
+func (d *decrypt) parseCipherText(cipherText string) ([]string, error) {
+	cipherTextSize := len(cipherText)
+	if cipherTextSize < CipherTextPartSize {
 		return nil, ErrInvalidCipherText
 	}
 
 	start := 0
 	end := CipherTextPartSize
 	parts := make([]string, 0)
-	partsSize := int(math.Ceil(float64(len(d.cipherText)) / float64(CipherTextPartSize)))
+	partsSize := int(math.Ceil(float64(cipherTextSize) / float64(CipherTextPartSize)))
 	for i := 0; i < partsSize; i++ {
-		part := d.cipherText[start:end]
+		part := cipherText[start:end]
 		parts = append(parts, part)
+
 		start += CipherTextPartSize
 		end += CipherTextPartSize
-		if end > len(d.cipherText) {
-			end = len(d.cipherText)
+		if end > cipherTextSize {
+			end = cipherTextSize
 		}
 	}
 

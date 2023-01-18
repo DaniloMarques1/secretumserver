@@ -14,6 +14,13 @@ type Claims struct {
 
 const ExpiresIn = 3600
 
+type TokenResponse struct {
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int // how long in seconds the AccessToken will still be valid
+}
+
+// TODO: we need to generate a refresh token as well
 func GetToken(masterId string) (string, error) {
 	claims := &Claims{
 		MasterId: masterId,

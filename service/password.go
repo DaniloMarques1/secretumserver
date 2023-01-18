@@ -22,6 +22,8 @@ var (
 type PasswordService struct {
 	pb.UnimplementedPasswordServer
 	passwordRepository model.PasswordRepository
+	e                  encrypt.Encrypt
+	d                  encrypt.Decrypt
 }
 
 func NewPasswordService() (*PasswordService, error) {
@@ -30,8 +32,21 @@ func NewPasswordService() (*PasswordService, error) {
 		log.Printf("Error creating password service %v\n", err)
 		return nil, err
 	}
+	e, err := encrypt.NewEncrypt()
+	if err != nil {
+		log.Printf("error getting encryption type %v\n", err)
+		return nil, err
+	}
+	d, err := encrypt.NewDecrypt()
+	if err != nil {
+		log.Printf("error getting decryption type %v\n", err)
+		return nil, err
+	}
+
 	return &PasswordService{
 		passwordRepository: passwordRepository,
+		e:                  e,
+		d:                  d,
 	}, nil
 }
 
@@ -56,13 +71,7 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 		return nil, status.Errorf(codes.AlreadyExists, ErrKeyAlreadyUsed)
 	}
 
-	// TODO: refactor
-	e, err := encrypt.NewEncrypt(in.GetPassword())
-	if err != nil {
-		log.Printf("Error getting the encryption type %v\n", err)
-		return nil, err
-	}
-	encrypted, err := e.EncryptMessage()
+	encrypted, err := ps.e.EncryptMessage(in.GetPassword())
 	if err != nil {
 		log.Printf("Error while encrypting password %v\n", err)
 		return nil, err
@@ -100,13 +109,8 @@ func (ps *PasswordService) FindPassword(ctx context.Context, in *pb.FindPassword
 		log.Printf("Error finding the password %v\n", err)
 		return nil, err
 	}
-	// TODO: refactor
-	d, err := encrypt.NewDecrypt(password.Pwd)
-	if err != nil {
-		log.Printf("Error getting the decryption type %v\n", err)
-		return nil, err
-	}
-	decrypted, err := d.DecryptMessage()
+
+	decrypted, err := ps.d.DecryptMessage(password.Pwd)
 	if err != nil {
 		log.Printf("Error while decrypting password %v\n", err)
 		return nil, err
@@ -183,12 +187,7 @@ func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePass
 		return nil, err
 	}
 
-	e, err := encrypt.NewEncrypt(in.GetPassword())
-	if err != nil {
-		log.Printf("Error getting the encryption type %v\n", err)
-		return nil, err
-	}
-	encrypted, err := e.EncryptMessage()
+	encrypted, err := ps.e.EncryptMessage(in.GetPassword())
 	if err != nil {
 		log.Printf("Error encrypting password %v\n", err)
 		return nil, err
@@ -221,12 +220,7 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 	}
 
 	generatedPassword := generate.GeneratePassword(in.GetKeyphrase())
-	e, err := encrypt.NewEncrypt(generatedPassword)
-	if err != nil {
-		log.Printf("Error getting the encryption type %v\n", err)
-		return nil, err
-	}
-	encrypted, err := e.EncryptMessage()
+	encrypted, err := ps.e.EncryptMessage(generatedPassword)
 	if err != nil {
 		log.Printf("Error encrypting message %v\n", err)
 		return nil, err

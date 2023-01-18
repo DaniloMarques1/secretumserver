@@ -2,7 +2,6 @@ package generate
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -18,7 +17,7 @@ var specialCharsBindings = map[string]string{
 	"g": ")",
 	"h": "@",
 	"i": "%",
-	"j": "@",
+	"j": "_",
 	"k": "#",
 	"l": "&",
 	"m": "*",
@@ -31,7 +30,7 @@ var specialCharsBindings = map[string]string{
 	"t": "**",
 	"u": "(",
 	"v": ")",
-	"w": "@",
+	"w": "_",
 	"x": "*",
 	"y": "@",
 	"z": "!",
@@ -53,7 +52,7 @@ var specialCharsBindings = map[string]string{
 	"P": "&",
 	"Q": "!",
 	"R": "!!",
-	"S": "@@",
+	"S": "_",
 	"T": "((",
 	"U": "))",
 	"V": "@$",
@@ -63,43 +62,55 @@ var specialCharsBindings = map[string]string{
 	"Z": "!",
 }
 
+const (
+	SpecialCharsQty     = 12
+	NumbersQty          = 10
+	LettersQty          = 5
+	UpperCaseLettersQty = 10
+)
+
+const (
+	MinPasswordSize = 15
+	MaxPasswordSize = 45
+)
+
+// TODO refactor
 func GeneratePassword(keyphrase string) string {
 	var password string
 	keyphraseSize := len(keyphrase)
 
 	// building special chars
-	for i := 0; i < 12; i++ {
+	for i := 0; i < SpecialCharsQty; i++ {
 		idx := getRandomInt(0, keyphraseSize)
 		specialChar := specialCharsBindings[string(keyphrase[idx])]
 		password += specialChar
 	}
 
 	// 10 random numbers
-	for i := 0; i < 10; i++ {
+	for i := 0; i < NumbersQty; i++ {
 		password += fmt.Sprintf("%d", getRandomInt(0, 10))
 	}
 
 	// five random letters from the keyphrase
-	for i := 0; i < 5; i++ {
+	for i := 0; i < LettersQty; i++ {
 		idx := getRandomInt(0, keyphraseSize)
 		letter := keyphrase[idx]
 		password += strings.ToUpper(string(letter))
 	}
 
 	// 10 random uppercase letters
-	for i := 0; i < 10; i++ {
+	for i := 0; i < UpperCaseLettersQty; i++ {
 		asciiDecimal := getRandomInt(97, 123)
-		log.Printf("%v\n", asciiDecimal)
 		password += string(rune(asciiDecimal))
 	}
 
-	randomPasswordSize := getRandomInt(45, 60)
-	randomPassword := make([]byte, 0, randomPasswordSize)
+	randomPasswordSize := getRandomInt(MinPasswordSize, MaxPasswordSize)
+	randomPassword := make([]byte, randomPasswordSize)
 
 	// mix them up
 	for i := 0; i < randomPasswordSize; i++ {
 		idx := getRandomInt(0, len(password))
-		randomPassword = append(randomPassword, password[idx])
+		randomPassword[i] = password[idx]
 	}
 
 	return string(randomPassword)
