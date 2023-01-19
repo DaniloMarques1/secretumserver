@@ -110,15 +110,16 @@ func (ms *MasterService) AuthenticateMaster(ctx context.Context, in *pb.AuthMast
 		)
 	}
 
-	tokenStr, err := token.GetToken(master.Id)
+	tokenResponse, err := token.GetToken(master.Id)
 	if err != nil {
 		log.Printf("Error getting token %v\n", err)
 		return nil, err
 	}
 
 	return &pb.AuthMasterResponse{
-		AccessToken: tokenStr,
-		ExpiresIn:   token.ExpiresIn,
+		AccessToken:  tokenResponse.AccessToken,
+		ExpiresIn:    tokenResponse.ExpiresIn,
+		RefreshToken: tokenResponse.RefreshToken,
 	}, nil
 }
 
@@ -154,6 +155,29 @@ func (ms *MasterService) UpdateMaster(ctx context.Context, in *pb.UpdateMasterRe
 		OK: true,
 	}, nil
 
+}
+
+func (ms *MasterService) RefreshToken(ctx context.Context, in *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
+	if len(in.GetRefreshToken()) == 0 {
+		log.Printf("Error validating refresh token request\n")
+		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
+	}
+
+	claims, err := token.ValidateRefreshToken(in.GetRefreshToken())
+	if err != nil {
+		return nil, err
+	}
+
+	tokenResponse, err := token.GetToken(claims.MasterId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.RefreshTokenResponse{
+		AccessToken:  tokenResponse.AccessToken,
+		ExpiresIn:    tokenResponse.ExpiresIn,
+		RefreshToken: tokenResponse.RefreshToken,
+	}, nil
 }
 
 // return now + 30 days

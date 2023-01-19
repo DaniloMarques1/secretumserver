@@ -1,42 +1,104 @@
 package token
 
 import (
+	"errors"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
+const (
+	RefreshTokenType = iota
+	AccessTokenType
+)
+
 type Claims struct {
-	MasterId string
+	MasterId  string
+	TokenType uint
 	jwt.StandardClaims
 }
 
-const ExpiresIn = 3600
+const (
+	AccessTokenExpiresIn  = 3600   // an hour in seconds
+	RefreshTokenExpiresIn = 604800 // a week in seconds
+)
 
 type TokenResponse struct {
 	AccessToken  string
 	RefreshToken string
-	ExpiresIn    int // how long in seconds the AccessToken will still be valid
+	ExpiresIn    int32 // how long in seconds the AccessToken will still be valid
 }
 
-// TODO: we need to generate a refresh token as well
-func GetToken(masterId string) (string, error) {
-	claims := &Claims{
-		MasterId: masterId,
+func GetToken(masterId string) (*TokenResponse, error) {
+	accessTokenClaims := &Claims{
+		MasterId:  masterId,
+		TokenType: AccessTokenType,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + ExpiresIn,
+			ExpiresAt: time.Now().Unix() + AccessTokenExpiresIn,
 		},
 	}
+	accessToken, err := generateToken(accessTokenClaims)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshTokenClaims := &Claims{
+		MasterId:  masterId,
+		TokenType: RefreshTokenType,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Unix() + RefreshTokenExpiresIn,
+		},
+	}
+	refreshToken, err := generateToken(refreshTokenClaims)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresIn:    AccessTokenExpiresIn,
+	}, nil
+}
+
+func generateToken(claims *Claims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString([]byte(os.Getenv("JWT_KEY")))
+	key := []byte(os.Getenv("JWT_KEY"))
+	tokenStr, err := token.SignedString(key)
 	if err != nil {
 		return "", err
 	}
 	return tokenStr, nil
 }
 
-func ValidateToken(tokenStr string) (*Claims, error) {
+func ValidateAccessToken(tokenStr string) (*Claims, error) {
+	claims, err := validateToken(tokenStr)
+	if err != nil {
+		return nil, err
+	}
+
+	if claims.TokenType != AccessTokenType {
+		return nil, errors.New("Invalid toke type")
+	}
+
+	return claims, nil
+}
+
+func ValidateRefreshToken(tokenStr string) (*Claims, error) {
+	claims, err := validateToken(tokenStr)
+	if err != nil {
+		return nil, err
+	}
+
+	if claims.TokenType != RefreshTokenType {
+		return nil, errors.New("Invalid toke type")
+	}
+
+	return claims, nil
+}
+
+func validateToken(tokenStr string) (*Claims, error) {
 	claims := &Claims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
 		return []byte(os.Getenv("JWT_KEY")), nil
@@ -44,5 +106,6 @@ func ValidateToken(tokenStr string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return claims, nil
 }

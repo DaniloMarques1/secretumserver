@@ -36,7 +36,6 @@ func TestEncrypt(t *testing.T) {
 				t.Fatalf("Err should when encrypting be nil %v\n", err)
 			}
 
-
 			decrypted, err := d.DecryptMessage(crypted)
 			if err != nil {
 				t.Fatalf("Err should when decrypting be nil %v\n", err)

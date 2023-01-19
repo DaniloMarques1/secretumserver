@@ -59,7 +59,7 @@ func (ps *PasswordService) SavePassword(context context.Context, in *pb.CreatePa
 		)
 	}
 
-	claims, err := token.ValidateToken(in.GetAccessToken())
+	claims, err := token.ValidateAccessToken(in.GetAccessToken())
 	if err != nil {
 		log.Printf("Error validating token %v\n", err)
 		return nil, err
@@ -97,7 +97,7 @@ func (ps *PasswordService) FindPassword(ctx context.Context, in *pb.FindPassword
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
-	claims, err := token.ValidateToken(in.GetAccessToken())
+	claims, err := token.ValidateAccessToken(in.GetAccessToken())
 	if err != nil {
 		log.Printf("Error validating token %v\n", err)
 		return nil, err
@@ -129,7 +129,7 @@ func (ps *PasswordService) RemovePassword(ctx context.Context, in *pb.RemovePass
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
-	claims, err := token.ValidateToken(in.GetAccessToken())
+	claims, err := token.ValidateAccessToken(in.GetAccessToken())
 	if err != nil {
 		log.Printf("Error validating token %v\n", err)
 		return nil, err
@@ -155,7 +155,7 @@ func (ps *PasswordService) FindKeys(ctx context.Context, in *pb.FindKeysRequest)
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
-	claims, err := token.ValidateToken(in.GetAccessToken())
+	claims, err := token.ValidateAccessToken(in.GetAccessToken())
 	if err != nil {
 		log.Printf("Error validating token %v\n", err)
 		return nil, err
@@ -175,7 +175,7 @@ func (ps *PasswordService) UpdatePassword(ctx context.Context, in *pb.UpdatePass
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
-	claims, err := token.ValidateToken(in.GetAccessToken())
+	claims, err := token.ValidateAccessToken(in.GetAccessToken())
 	if err != nil {
 		log.Printf("Error validating token %v\n", err)
 		return nil, err
@@ -208,7 +208,7 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
 	}
 
-	claims, err := token.ValidateToken(in.GetAccessToken())
+	claims, err := token.ValidateAccessToken(in.GetAccessToken())
 	if err != nil {
 		log.Printf("Error validating token %v\n", err)
 		return nil, err
