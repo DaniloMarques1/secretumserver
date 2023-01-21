@@ -219,7 +219,8 @@ func (ps *PasswordService) GeneratePassword(ctx context.Context, in *pb.Generate
 		return nil, status.Errorf(codes.AlreadyExists, ErrKeyAlreadyUsed)
 	}
 
-	generatedPassword := generate.GeneratePassword(in.GetKeyphrase())
+	generatePassword := generate.NewGeneratePassword(in.GetKeyphrase())
+	generatedPassword := generatePassword.Generate()
 	encrypted, err := ps.e.EncryptMessage(generatedPassword)
 	if err != nil {
 		log.Printf("Error encrypting message %v\n", err)

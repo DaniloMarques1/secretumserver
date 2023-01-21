@@ -74,49 +74,72 @@ const (
 	MaxPasswordSize = 45
 )
 
-// TODO refactor
-func GeneratePassword(keyphrase string) string {
-	var password string
-	keyphraseSize := len(keyphrase)
-
-	// building special chars
-	for i := 0; i < SpecialCharsQty; i++ {
-		idx := getRandomInt(0, keyphraseSize)
-		specialChar := specialCharsBindings[string(keyphrase[idx])]
-		password += specialChar
-	}
-
-	// 10 random numbers
-	for i := 0; i < NumbersQty; i++ {
-		password += fmt.Sprintf("%d", getRandomInt(0, 10))
-	}
-
-	// five random letters from the keyphrase
-	for i := 0; i < LettersQty; i++ {
-		idx := getRandomInt(0, keyphraseSize)
-		letter := keyphrase[idx]
-		password += strings.ToUpper(string(letter))
-	}
-
-	// 10 random uppercase letters
-	for i := 0; i < UpperCaseLettersQty; i++ {
-		asciiDecimal := getRandomInt(97, 123)
-		password += string(rune(asciiDecimal))
-	}
-
-	randomPasswordSize := getRandomInt(MinPasswordSize, MaxPasswordSize)
-	randomPassword := make([]byte, randomPasswordSize)
-
-	// mix them up
-	for i := 0; i < randomPasswordSize; i++ {
-		idx := getRandomInt(0, len(password))
-		randomPassword[i] = password[idx]
-	}
-
-	return string(randomPassword)
+type GeneratePassword struct {
+	keyphraseSize      int
+	keyphrase          string
+	randomPassword     []byte
+	randomPasswordSize int
+	password           string
 }
 
-func getRandomInt(start, end int) int {
+func NewGeneratePassword(keyphrase string) *GeneratePassword {
+	gp := &GeneratePassword{}
+	gp.keyphrase = keyphrase
+	gp.keyphraseSize = len(keyphrase)
+	gp.randomPasswordSize = gp.getRandomInt(MinPasswordSize, MaxPasswordSize)
+	gp.randomPassword = make([]byte, gp.randomPasswordSize)
+
+	return gp
+}
+
+func (gp *GeneratePassword) Generate() string {
+	gp.formSpecialChars()
+	gp.formNumbers()
+	gp.formLettersFromTheKeyPhrase()
+	gp.formUpperCaseLetters()
+	gp.randomize()
+
+	return string(gp.randomPassword)
+}
+
+func (gp *GeneratePassword) formSpecialChars() {
+	for i := 0; i < SpecialCharsQty; i++ {
+		idx := gp.getRandomInt(0, gp.keyphraseSize)
+		specialChar := specialCharsBindings[string(gp.keyphrase[idx])]
+		gp.password += specialChar
+	}
+}
+
+func (gp *GeneratePassword) formNumbers() {
+	for i := 0; i < NumbersQty; i++ {
+		gp.password += fmt.Sprintf("%d", gp.getRandomInt(0, 10))
+	}
+}
+
+func (gp *GeneratePassword) formLettersFromTheKeyPhrase() {
+	for i := 0; i < LettersQty; i++ {
+		idx := gp.getRandomInt(0, gp.keyphraseSize)
+		letter := gp.keyphrase[idx]
+		gp.password += strings.ToUpper(string(letter))
+	}
+}
+
+func (gp *GeneratePassword) formUpperCaseLetters() {
+	for i := 0; i < UpperCaseLettersQty; i++ {
+		asciiDecimal := gp.getRandomInt(97, 123)
+		gp.password += string(rune(asciiDecimal))
+	}
+}
+
+func (gp *GeneratePassword) randomize() {
+	passwordSize := len(gp.password)
+	for i := 0; i < gp.randomPasswordSize; i++ {
+		idx := gp.getRandomInt(0, passwordSize)
+		gp.randomPassword[i] = gp.password[idx]
+	}
+}
+
+func (gp GeneratePassword) getRandomInt(start, end int) int {
 	seed := rand.NewSource(time.Now().UnixNano())
 	random := rand.New(seed)
 	randomInt := start + random.Intn(end-start)
