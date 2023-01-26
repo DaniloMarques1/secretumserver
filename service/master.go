@@ -157,7 +157,7 @@ func (ms *MasterService) UpdateMaster(ctx context.Context, in *pb.UpdateMasterRe
 
 }
 
-func (ms *MasterService) RefreshToken(ctx context.Context, in *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
+func (ms *MasterService) RefreshMasterToken(ctx context.Context, in *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
 	if len(in.GetRefreshToken()) == 0 {
 		log.Printf("Error validating refresh token request\n")
 		return nil, status.Errorf(codes.InvalidArgument, ErrValidation)
